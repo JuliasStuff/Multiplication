@@ -1,0 +1,1929 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<title>Multiplication Quest</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<meta name="theme-color" content="#a78bfa" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="MultQuest" />
+<meta name="application-name" content="Multiplication Quest" />
+<style>
+  /* Reset & root */
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:          #0b0f1f;
+    --panel-bg:    #141a33;
+    --input-bg:    #06080f;
+    --fg:          #e6e9ff;
+    --muted:       #7a82a8;
+    --accent:      #a78bfa;
+    --accent-2:    #c4b5fd;
+    --pink:        #f472b6;
+    --green:       #4ade80;
+    --red:         #f87171;
+    --gold:        #facc15;
+    --radius:      8px;
+    --font:        'Consolas', 'Courier New', monospace;
+  }
+
+  html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--font);
+  }
+
+  body {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    padding-top:    env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  /* HUD bar */
+  #hud {
+    display: flex;
+    align-items: center;
+    padding: 14px 24px 8px;
+    gap: 20px;
+  }
+  #hud-round  { color: var(--accent); font-weight: bold; font-size: .85rem; letter-spacing: .06em; }
+  #hud-today  { color: var(--accent-2); font-weight: bold; font-size: .85rem; letter-spacing: .06em; }
+  #hud-streak { color: var(--gold);   font-weight: bold; font-size: .85rem; letter-spacing: .06em; }
+  #hud-score  { color: var(--pink);   font-weight: bold; font-size: .85rem; letter-spacing: .06em; margin-left: auto; }
+
+  .hud-divider { height: 2px; background: var(--accent); margin: 0 24px; }
+
+  /* Card */
+  #card-wrap {
+    flex: 1;
+    padding: 14px 24px;
+    display: flex;
+    flex-direction: column;
+  }
+
+  .neon-border {
+    flex: 1;
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    background: var(--panel-bg);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 28px 24px 20px;
+    gap: 18px;
+    overflow-y: auto;
+  }
+
+  /* Question */
+  #problem {
+    font-size: 4.6rem;
+    font-weight: bold;
+    color: var(--fg);
+    letter-spacing: .04em;
+    text-align: center;
+    line-height: 1.05;
+    margin-top: 8px;
+  }
+  #problem .op  { color: var(--accent); margin: 0 .25em; }
+  #problem .eq  { color: var(--muted);  margin: 0 .25em; }
+  #problem .qm  { color: var(--gold); }
+
+  #hint-text {
+    color: var(--gold);
+    font-size: .9rem;
+    letter-spacing: .04em;
+    min-height: 1em;
+    text-align: center;
+  }
+
+  /* Start screen */
+  #start-view {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 18px;
+    flex: 1;
+    width: 100%;
+    text-align: center;
+  }
+  #start-emoji {
+    font-size: 4rem;
+    line-height: 1;
+  }
+  #start-title {
+    font-size: 2rem;
+    font-weight: bold;
+    color: var(--accent);
+    letter-spacing: .08em;
+  }
+  #start-sub {
+    color: var(--muted);
+    font-size: 1rem;
+    line-height: 1.5;
+    max-width: 360px;
+  }
+
+  /* Input */
+  #input-label {
+    color: var(--accent);
+    font-size: .78rem;
+    font-weight: bold;
+    letter-spacing: .08em;
+  }
+  #answer-input {
+    background: var(--input-bg);
+    color: var(--fg);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    padding: 14px 18px;
+    font-family: var(--font);
+    font-size: 2.4rem;
+    font-weight: bold;
+    text-align: center;
+    width: 100%;
+    max-width: 320px;
+    outline: none;
+    caret-color: var(--accent);
+    transition: border-color .2s;
+  }
+  #answer-input:focus    { border-color: var(--pink); }
+  #answer-input.correct  { border-color: var(--green) !important; color: var(--green); }
+  #answer-input.wrong    { border-color: var(--red)   !important; color: var(--red);   }
+  #answer-input:disabled { opacity: .85; cursor: default; }
+
+  /* Feedback */
+  #feedback {
+    font-size: 1.05rem;
+    min-height: 1.4em;
+    text-align: center;
+    font-weight: bold;
+  }
+  #answer-reveal {
+    display: none;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 10px 20px;
+    border-radius: 6px;
+    width: 100%;
+    max-width: 480px;
+  }
+  #answer-reveal-label {
+    font-size: .75rem;
+    font-weight: bold;
+    letter-spacing: .1em;
+  }
+  #revealed-answer {
+    font-size: 2.2rem;
+    font-weight: bold;
+    text-align: center;
+    letter-spacing: .08em;
+  }
+
+  /* Bottom controls */
+  #controls {
+    display: flex;
+    align-items: center;
+    padding: 0 24px 18px;
+    gap: 10px;
+  }
+
+  .btn-action {
+    background: var(--pink);
+    color: var(--bg);
+    border: none;
+    border-radius: var(--radius);
+    padding: 12px 24px;
+    font-family: var(--font);
+    font-size: .95rem;
+    font-weight: bold;
+    cursor: pointer;
+    letter-spacing: .05em;
+    margin-left: auto;
+    transition: opacity .15s;
+  }
+  .btn-action:hover  { opacity: .85; }
+  .btn-action:active { opacity: .7;  }
+  .btn-action:disabled { opacity: .4; cursor: default; }
+
+  .btn-ctrl {
+    background: var(--panel-bg);
+    color: var(--muted);
+    border: 1px solid #2a3060;
+    border-radius: var(--radius);
+    padding: 10px 16px;
+    font-family: var(--font);
+    font-size: .82rem;
+    cursor: pointer;
+    letter-spacing: .05em;
+    transition: color .15s;
+  }
+  .btn-ctrl:hover { color: var(--pink); }
+  .btn-ctrl.accent { color: var(--accent); }
+  .btn-ctrl.accent:hover { color: var(--gold); }
+  .btn-ctrl.gold { color: var(--gold); }
+  .btn-ctrl.gold:hover { color: var(--accent); }
+
+  /* Summary view */
+  #summary {
+    display: none;
+    flex-direction: column;
+    gap: 12px;
+    width: 100%;
+    height: 100%;
+  }
+
+  #summary-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: 8px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid #2a3060;
+  }
+  #summary-score { color: var(--gold); font-size: 1.6rem; font-weight: bold; }
+  #summary-meta  { color: var(--accent); font-size: .9rem; }
+
+  /* Perfect-game banner */
+  #perfect-banner {
+    display: none;
+    text-align: center;
+    font-size: 2.8rem;
+    font-weight: bold;
+    letter-spacing: .18em;
+    padding: 14px 0 6px;
+    background: linear-gradient(90deg, #f472b6, #facc15, #4ade80, #22d3ee, #a78bfa, #f472b6);
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    color: transparent;
+    animation: perfect-shimmer 2.4s linear infinite, perfect-pop .6s ease-out;
+    filter: drop-shadow(0 0 16px rgba(255,255,255,.25));
+  }
+  #perfect-banner.show { display: block; }
+  @keyframes perfect-shimmer {
+    0%   { background-position:   0% 0; }
+    100% { background-position: 200% 0; }
+  }
+  @keyframes perfect-pop {
+    0%   { transform: scale(.4); opacity: 0; }
+    60%  { transform: scale(1.15); opacity: 1; }
+    100% { transform: scale(1); }
+  }
+
+  /* Streak-milestone toast */
+  #streak-toast {
+    position: fixed;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%) translateY(-20px);
+    background: linear-gradient(135deg, var(--gold), var(--pink));
+    color: var(--bg);
+    font-weight: bold;
+    font-family: var(--font);
+    font-size: 1.05rem;
+    letter-spacing: .08em;
+    padding: 10px 20px;
+    border-radius: 999px;
+    box-shadow: 0 6px 24px rgba(0,0,0,.35);
+    opacity: 0;
+    pointer-events: none;
+    z-index: 250;
+    transition: opacity .25s ease, transform .25s ease;
+  }
+  #streak-toast.show {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+
+  /* Confetti overlay */
+  #confetti-canvas {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    z-index: 200;
+  }
+
+  #summary-cols {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .summary-col h3 {
+    font-size: .8rem;
+    letter-spacing: .07em;
+    margin-bottom: 8px;
+  }
+  .summary-col h3.green { color: var(--green); }
+  .summary-col h3.red   { color: var(--red); }
+
+  .summary-list {
+    overflow-y: auto;
+    background: var(--input-bg);
+    border-radius: var(--radius);
+    padding: 8px 10px;
+    flex: 1;
+    font-size: .9rem;
+  }
+
+  .summary-fact          { color: var(--green); margin-bottom: 6px; }
+  .summary-fact.missed   { color: var(--red); }
+  .summary-fact .meta    { color: var(--muted); font-size: .75rem; }
+
+  /* Stats modal */
+  #stats-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,.75);
+    z-index: 100;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+  #stats-overlay.open { display: flex; }
+
+  #stats-panel {
+    background: var(--panel-bg);
+    border: 2px solid var(--accent);
+    border-radius: var(--radius);
+    width: 100%;
+    max-width: 880px;
+    max-height: 92vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+  }
+
+  #stats-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 14px 20px;
+    border-bottom: 1px solid #2a3060;
+    flex-shrink: 0;
+    gap: 12px;
+  }
+  #stats-summary-line { color: var(--accent); font-size: .9rem; flex: 1; }
+
+  .btn-close {
+    background: transparent;
+    border: none;
+    color: var(--muted);
+    font-size: 1.2rem;
+    cursor: pointer;
+    line-height: 1;
+    padding: 4px 8px;
+  }
+  .btn-close:hover { color: var(--pink); }
+
+  #stats-tabs {
+    display: flex;
+    gap: 4px;
+    padding: 10px 20px 0;
+    border-bottom: 1px solid #2a3060;
+    flex-shrink: 0;
+  }
+  #stats-tabs button {
+    background: transparent;
+    color: var(--muted);
+    border: 1px solid transparent;
+    border-bottom: none;
+    border-radius: 6px 6px 0 0;
+    padding: 8px 14px;
+    font-family: var(--font);
+    font-size: .8rem;
+    cursor: pointer;
+    letter-spacing: .05em;
+  }
+  #stats-tabs button.active {
+    color: var(--accent);
+    border-color: #2a3060;
+    background: var(--bg);
+  }
+
+  #stats-body {
+    overflow-y: auto;
+    flex: 1;
+    padding: 14px 20px 20px;
+  }
+
+  /* Grid view */
+  #grid-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    font-size: .75rem;
+    color: var(--muted);
+  }
+  #grid-legend .lg-swatch {
+    display: inline-block;
+    width: 12px; height: 12px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 4px;
+  }
+  #grid-legend .lg-mastered    { background: var(--green); }
+  #grid-legend .lg-learning    { background: var(--gold); }
+  #grid-legend .lg-struggling  { background: var(--red); }
+  #grid-legend .lg-new         { background: #2a3060; }
+
+  #fact-grid {
+    display: grid;
+    grid-template-columns: 36px repeat(12, 1fr);
+    gap: 4px;
+    font-size: .75rem;
+  }
+  #fact-grid .gh, #fact-grid .gv {
+    color: var(--accent);
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    aspect-ratio: 1 / 1;
+  }
+  #fact-grid .cell {
+    aspect-ratio: 1 / 1;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #1a2040;
+    color: var(--muted);
+    font-weight: bold;
+    cursor: help;
+    border: 1px solid transparent;
+    transition: transform .1s;
+  }
+  #fact-grid .cell:hover { transform: scale(1.08); border-color: var(--fg); }
+  #fact-grid .cell.mastered   { background: rgba(74,222,128,.22); color: var(--green); }
+  #fact-grid .cell.learning   { background: rgba(250,204,21,.18); color: var(--gold);  }
+  #fact-grid .cell.struggling { background: rgba(248,113,113,.20); color: var(--red); }
+
+  /* Table view */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+  }
+  thead th {
+    position: sticky;
+    top: 0;
+    background: var(--bg);
+    color: var(--accent);
+    text-align: left;
+    padding: 10px 12px;
+    font-weight: bold;
+    letter-spacing: .05em;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+  }
+  thead th:hover { color: var(--gold); }
+  thead th .sort-arrow { opacity: .4; margin-left: 4px; }
+  thead th.sorted .sort-arrow { opacity: 1; }
+
+  tbody tr:nth-child(even) { background: rgba(255,255,255,.03); }
+  tbody td {
+    padding: 8px 12px;
+    color: var(--fg);
+    border-bottom: 1px solid #1a2040;
+    white-space: nowrap;
+  }
+  tbody td.fact-cell { color: var(--accent); font-weight: bold; }
+  tbody td.state-mastered   { color: var(--green); font-weight: bold; }
+  tbody td.state-learning   { color: var(--gold);  font-weight: bold; }
+  tbody td.state-struggling { color: var(--red);   font-weight: bold; }
+  tbody td.state-new        { color: var(--muted); }
+  .acc-high { color: var(--green); }
+  .acc-mid  { color: var(--gold); }
+  .acc-low  { color: var(--red); }
+
+  /* Responsive */
+  @media (max-width: 780px) {
+    #problem { font-size: 3.6rem; }
+  }
+  @media (max-width: 520px) {
+    #hud { padding: 10px 12px 6px; gap: 12px; }
+    .hud-divider { margin: 0 12px; }
+    #card-wrap  { padding: 10px 12px; }
+    #controls   {
+      padding: 0 12px 12px;
+      flex-wrap: wrap;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn-ctrl   { padding: 8px 12px; font-size: .72rem; }
+    .btn-action {
+      margin-left: 0;
+      flex: 1 1 100%;
+      order: 99;
+      padding: 14px 20px;
+    }
+    #problem      { font-size: 3rem; }
+    #answer-input { font-size: 1.8rem; max-width: 240px; }
+    #summary-cols { grid-template-columns: 1fr; }
+    #fact-grid    { font-size: .65rem; grid-template-columns: 28px repeat(12, 1fr); gap: 3px; }
+    thead th, tbody td { padding: 6px 8px; }
+  }
+  @media (max-width: 430px) {
+    #problem      { font-size: 2.4rem; }
+  }
+</style>
+</head>
+<body>
+
+<!-- HUD -->
+<div id="hud">
+  <span id="hud-round">ROUND 01 / 10</span>
+  <span id="hud-today">TODAY 0</span>
+  <span id="hud-streak">STREAK ×0</span>
+  <span id="hud-score">SCORE  000</span>
+</div>
+<div class="hud-divider"></div>
+
+<!-- Card -->
+<div id="card-wrap">
+  <div class="neon-border" id="quiz-card">
+
+    <!-- Start view -->
+    <div id="start-view">
+      <div id="start-emoji">🎯</div>
+      <div id="start-title">READY?</div>
+      <div id="start-sub">10 multiplication facts.<br>Take your time and do your best!</div>
+    </div>
+
+    <!-- Quiz view -->
+    <div id="quiz-view" style="display:none;flex-direction:column;align-items:center;width:100%;gap:16px;flex:1;justify-content:center;">
+      <div id="problem"><span class="a">7</span><span class="op">×</span><span class="b">8</span><span class="eq">=</span><span class="qm">?</span></div>
+      <div id="hint-text">&nbsp;</div>
+
+      <div id="input-label">TYPE THE ANSWER</div>
+      <input id="answer-input" type="text"
+             inputmode="numeric"
+             pattern="[0-9]*"
+             autocomplete="off" autocorrect="off"
+             autocapitalize="off" spellcheck="false"
+             maxlength="4"
+             placeholder="" />
+
+      <div id="feedback">&nbsp;</div>
+      <div id="answer-reveal">
+        <div id="answer-reveal-label">CORRECT ANSWER</div>
+        <div id="revealed-answer"></div>
+      </div>
+    </div>
+
+    <!-- Summary view -->
+    <div id="summary">
+      <div id="perfect-banner">★ PERFECT! ★</div>
+      <div id="summary-header">
+        <div id="summary-score">FINAL SCORE  0000</div>
+        <div id="summary-meta">0 / 0 correct · best streak ×0</div>
+      </div>
+      <div id="summary-cols">
+        <div class="summary-col" style="display:flex;flex-direction:column;min-height:0;">
+          <h3 class="green">&#10003; CORRECT (0)</h3>
+          <div class="summary-list" id="summary-right"></div>
+        </div>
+        <div class="summary-col" style="display:flex;flex-direction:column;min-height:0;">
+          <h3 class="red">&#10007; MISSED (0)</h3>
+          <div class="summary-list" id="summary-wrong"></div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Controls -->
+<div id="controls">
+  <button class="btn-ctrl accent" id="btn-new-game">NEW GAME</button>
+  <button class="btn-ctrl accent" id="btn-stats">STATS</button>
+  <button class="btn-ctrl gold"   id="btn-hint">HINT</button>
+  <button class="btn-ctrl"        id="btn-skip">SKIP</button>
+  <button class="btn-action"      id="btn-action">SUBMIT  &#8629;</button>
+</div>
+
+<!-- Celebration overlay (confetti / fireworks) -->
+<canvas id="confetti-canvas" aria-hidden="true"></canvas>
+<div id="streak-toast" aria-hidden="true"></div>
+
+<!-- Stats modal -->
+<div id="stats-overlay" role="dialog" aria-modal="true" aria-label="All-time statistics">
+  <div id="stats-panel">
+    <div id="stats-header">
+      <span id="stats-summary-line">Loading&hellip;</span>
+      <button class="btn-close" id="btn-close-stats" aria-label="Close stats">&#10005;</button>
+    </div>
+    <div id="stats-tabs">
+      <button data-view="grid"  class="active">GRID</button>
+      <button data-view="table">TABLE</button>
+    </div>
+    <div id="stats-body">
+      <div id="stats-view-grid">
+        <div id="grid-legend">
+          <span><span class="lg-swatch lg-mastered"></span>Mastered</span>
+          <span><span class="lg-swatch lg-learning"></span>Learning</span>
+          <span><span class="lg-swatch lg-struggling"></span>Needs practice</span>
+          <span><span class="lg-swatch lg-new"></span>Not yet seen</span>
+        </div>
+        <div id="fact-grid"></div>
+      </div>
+      <div id="stats-view-table" style="display:none;">
+        <table id="stats-table">
+          <thead>
+            <tr>
+              <th data-col="fact">Fact <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="state">State <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="attempts">Tries <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="right">&#10003; <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="wrong">&#10007; <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="accuracy">Acc% <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="median">Median <span class="sort-arrow">&#8597;</span></th>
+              <th data-col="last_seen">Last seen <span class="sort-arrow">&#8597;</span></th>
+            </tr>
+          </thead>
+          <tbody id="stats-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ================================================================
+   Multiplication Quest — standalone web edition
+   Open index.html directly in any browser — no server needed.
+   ================================================================ */
+
+// Configuration
+const MIN_FACTOR        = 1;
+const MAX_FACTOR        = 12;
+const TOTAL_ROUNDS      = 10;
+const MASTERY_MEDIAN_MS = 4000;   // median first-try-correct time must be <= this
+const MASTERY_MIN_RIGHT = 4;      // ≥ this many correct first-try answers
+const TIMES_WINDOW      = 10;     // keep last N first-try-correct times per fact
+const STRUGGLE_MIN_TRIES = 3;
+const STRUGGLE_ACC      = 0.5;    // accuracy below this with enough tries = struggling
+
+// Leitner-style intervals in seconds, indexed by box level 0..7.
+const INTERVALS_SEC = [0, 60, 300, 1800, 7200, 86_400, 259_200, 604_800];
+
+const STORAGE_KEY = 'multiplicationQuestStats.v1';
+const DAILY_KEY   = 'multiplicationQuestDaily.v1';
+
+// Cross-device sync via JSONBin.io (optional — leave REPLACE_ to disable).
+const JSONBIN_BIN_ID     = 'REPLACE_WITH_BIN_ID';
+const JSONBIN_ACCESS_KEY = 'REPLACE_WITH_ACCESS_KEY';
+const JSONBIN_URL        = `https://api.jsonbin.io/v3/b/${JSONBIN_BIN_ID}`;
+
+// State
+let deck         = [];
+let index        = 0;
+let score        = 0;
+let asked        = 0;
+let streak       = 0;
+let bestStreak   = 0;
+let results      = [];
+let awaitingStart = false;
+let awaitingNext  = false;
+let awaitingRetry = false;
+let hintUsed      = false;
+let firstTryWrong = false;
+let currentFact   = null;     // { a, b, answer, key }
+let questionShownAt = 0;
+
+let sortCol = 'fact';
+let sortAsc = true;
+let activeStatsView = 'grid';
+
+// Fact / key helpers
+function factKey(a, b) {
+    return `${a}x${b}`;
+}
+
+function allFacts() {
+    const out = [];
+    for (let a = MIN_FACTOR; a <= MAX_FACTOR; a++) {
+        for (let b = MIN_FACTOR; b <= MAX_FACTOR; b++) {
+            out.push({ a, b, answer: a * b, key: factKey(a, b) });
+        }
+    }
+    return out;
+}
+
+// Stats persistence
+function emptyEntry() {
+    return {
+        attempts:   0,
+        right:      0,           // correct on first try
+        wrong:      0,           // wrong on first try (includes skips)
+        streak:     0,           // current first-try-correct streak
+        best_streak: 0,
+        times:      [],          // last N first-try-correct answer durations (ms)
+        box:        0,           // Leitner box 0..7
+        first_seen: null,
+        last_seen:  null,
+        next_due:   null         // ISO timestamp
+    };
+}
+
+// Daily round counter — resets at local midnight.
+function todayKey() {
+    const d = new Date();
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, '0');
+    const day = String(d.getDate()).padStart(2, '0');
+    return `${y}-${m}-${day}`;
+}
+
+function loadDaily() {
+    try {
+        const raw = localStorage.getItem(DAILY_KEY);
+        if (!raw) {
+            return { date: todayKey(), count: 0 };
+        }
+        const data = JSON.parse(raw);
+        if (!data || data.date !== todayKey()) {
+            return { date: todayKey(), count: 0 };
+        }
+        return { date: data.date, count: data.count || 0 };
+    } catch {
+        return { date: todayKey(), count: 0 };
+    }
+}
+
+function bumpDaily() {
+    const d = loadDaily();
+    d.count += 1;
+    try {
+        localStorage.setItem(DAILY_KEY, JSON.stringify(d));
+    } catch {}
+    return d.count;
+}
+
+function loadStats() {
+    try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (!raw) {
+            return { facts: {} };
+        }
+        const data = JSON.parse(raw);
+        if (!data || typeof data.facts !== 'object') {
+            return { facts: {} };
+        }
+        return data;
+    } catch {
+        return { facts: {} };
+    }
+}
+
+function saveStats(data) {
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    } catch {}
+    pushRemote(data);
+}
+
+function getEntry(data, key) {
+    if (!data.facts[key]) {
+        data.facts[key] = emptyEntry();
+    }
+    return data.facts[key];
+}
+
+// Median helper
+function median(arr) {
+    if (!arr || arr.length === 0) {
+        return null;
+    }
+    const sorted = arr.slice().sort((a, b) => a - b);
+    const mid = Math.floor(sorted.length / 2);
+    if (sorted.length % 2 === 0) {
+        return (sorted[mid - 1] + sorted[mid]) / 2;
+    }
+    return sorted[mid];
+}
+
+// Mastery classification for a fact entry.
+function classify(entry) {
+    if (!entry || entry.attempts === 0) {
+        return 'new';
+    }
+    const med = median(entry.times);
+    const acc = entry.attempts ? entry.right / entry.attempts : 0;
+    if (entry.right >= MASTERY_MIN_RIGHT
+        && med !== null
+        && med <= MASTERY_MEDIAN_MS
+        && entry.streak >= 2) {
+        return 'mastered';
+    }
+    if (entry.attempts >= STRUGGLE_MIN_TRIES && acc < STRUGGLE_ACC) {
+        return 'struggling';
+    }
+    return 'learning';
+}
+
+// Cross-device sync (JSONBin.io)
+function syncEnabled() {
+    return JSONBIN_BIN_ID
+        && !JSONBIN_BIN_ID.startsWith('REPLACE_')
+        && JSONBIN_ACCESS_KEY
+        && !JSONBIN_ACCESS_KEY.startsWith('REPLACE_');
+}
+
+function mergeStats(a, b) {
+    const out = { facts: {} };
+    const keys = new Set([
+        ...Object.keys(a.facts || {}),
+        ...Object.keys(b.facts || {})
+    ]);
+    for (const k of keys) {
+        const x = (a.facts && a.facts[k]) || emptyEntry();
+        const y = (b.facts && b.facts[k]) || emptyEntry();
+        // Prefer the side with more attempts (more recent learning history).
+        const winner = (y.attempts || 0) > (x.attempts || 0) ? y : x;
+        out.facts[k] = {
+            attempts:   Math.max(x.attempts || 0,   y.attempts || 0),
+            right:      Math.max(x.right || 0,      y.right || 0),
+            wrong:      Math.max(x.wrong || 0,      y.wrong || 0),
+            streak:     winner.streak || 0,
+            best_streak: Math.max(x.best_streak || 0, y.best_streak || 0),
+            times:      (winner.times && winner.times.length) ? winner.times : (x.times || y.times || []),
+            box:        Math.max(x.box || 0, y.box || 0),
+            first_seen: minDate(x.first_seen, y.first_seen),
+            last_seen:  maxDate(x.last_seen,  y.last_seen),
+            next_due:   maxDate(x.next_due,   y.next_due)
+        };
+    }
+    return out;
+}
+function minDate(a, b) {
+    if (!a) {
+        return b;
+    }
+    if (!b) {
+        return a;
+    }
+    return a < b ? a : b;
+}
+function maxDate(a, b) {
+    if (!a) {
+        return b;
+    }
+    if (!b) {
+        return a;
+    }
+    return a > b ? a : b;
+}
+
+async function pullRemote() {
+    if (!syncEnabled()) {
+        return null;
+    }
+    try {
+        const res = await fetch(`${JSONBIN_URL}/latest`, {
+            headers: { 'X-Access-Key': JSONBIN_ACCESS_KEY }
+        });
+        if (!res.ok) {
+            return null;
+        }
+        const body = await res.json();
+        const data = body && body.record;
+        if (data && typeof data.facts === 'object') {
+            return data;
+        }
+        return null;
+    } catch {
+        return null;
+    }
+}
+
+async function pushRemote(data) {
+    if (!syncEnabled()) {
+        return;
+    }
+    try {
+        await fetch(JSONBIN_URL, {
+            method:  'PUT',
+            headers: {
+                'Content-Type': 'application/json',
+                'X-Access-Key': JSONBIN_ACCESS_KEY
+            },
+            body: JSON.stringify(data)
+        });
+    } catch {}
+}
+
+async function syncOnStartup() {
+    const remote = await pullRemote();
+    if (!remote) {
+        return;
+    }
+    const local  = loadStats();
+    const merged = mergeStats(local, remote);
+    try {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+    } catch {}
+    pushRemote(merged);
+}
+
+// Spaced-repetition selection
+function nowIso() {
+    return new Date().toISOString();
+}
+
+function nowMs() {
+    return Date.now();
+}
+
+function dueScore(entry, now) {
+    // Higher = more overdue / more in need of practice.
+    if (!entry || entry.attempts === 0) {
+        return 0.5;   // new facts get a moderate base score
+    }
+    let s = 0;
+    if (entry.next_due) {
+        const dueMs = new Date(entry.next_due).getTime();
+        const overdueSec = (now - dueMs) / 1000;
+        if (overdueSec >= 0) {
+            // Boost the more overdue something is, capped.
+            s += Math.min(2.0, 0.5 + overdueSec / 86_400);
+        } else {
+            // Not due yet — small base weight so we can fall back to it.
+            s += 0.05;
+        }
+    } else {
+        s += 0.5;
+    }
+    const acc = entry.right / Math.max(1, entry.attempts);
+    s += (1 - acc) * 1.5;     // struggling facts get more weight
+    return s;
+}
+
+function selectDeck(n) {
+    const data  = loadStats();
+    const pool  = allFacts();
+    const now   = nowMs();
+
+    // Always make sure some never-seen facts get in — kids need new material.
+    const unseen = pool.filter(f => !data.facts[f.key] || data.facts[f.key].attempts === 0);
+    const seen   = pool.filter(f =>  data.facts[f.key] && data.facts[f.key].attempts >  0);
+
+    const chosen = [];
+
+    // First pass: a couple of new facts if available (max 3 per round).
+    const newCap = Math.min(3, unseen.length, Math.ceil(n / 3));
+    shuffle(unseen);
+    for (let i = 0; i < newCap; i++) {
+        chosen.push(unseen[i]);
+    }
+
+    // Remaining slots: weighted pick from seen facts, then fall back to leftover unseen.
+    const remaining = n - chosen.length;
+    const seenSorted = seen
+        .map(f => ({ fact: f, w: dueScore(data.facts[f.key], now) }))
+        .sort((a, b) => b.w - a.w);
+
+    // Build a weighted pool large enough to choose from without too much determinism.
+    const candidates = seenSorted.slice(0, Math.max(remaining * 3, 12));
+    while (chosen.length < n && candidates.length > 0) {
+        const total = candidates.reduce((s, c) => s + c.w, 0);
+        let r = Math.random() * total;
+        let pickIdx = candidates.length - 1;
+        for (let i = 0; i < candidates.length; i++) {
+            r -= candidates[i].w;
+            if (r <= 0) {
+                pickIdx = i;
+                break;
+            }
+        }
+        chosen.push(candidates[pickIdx].fact);
+        candidates.splice(pickIdx, 1);
+    }
+
+    // If still short (very early in life), fill from leftover unseen, then any.
+    if (chosen.length < n) {
+        for (let i = newCap; i < unseen.length && chosen.length < n; i++) {
+            chosen.push(unseen[i]);
+        }
+    }
+    if (chosen.length < n) {
+        const leftovers = pool.filter(f => !chosen.includes(f));
+        shuffle(leftovers);
+        for (const f of leftovers) {
+            if (chosen.length >= n) {
+                break;
+            }
+            chosen.push(f);
+        }
+    }
+
+    shuffle(chosen);
+    return chosen.slice(0, n);
+}
+
+function shuffle(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+    return arr;
+}
+
+// Recording an attempt
+function recordAttempt(fact, isCorrect, firstTry, elapsedMs) {
+    const data  = loadStats();
+    const entry = getEntry(data, fact.key);
+    const now   = nowIso();
+
+    entry.attempts += 1;
+    if (!entry.first_seen) {
+        entry.first_seen = now;
+    }
+    entry.last_seen = now;
+
+    if (firstTry && isCorrect) {
+        entry.right  += 1;
+        entry.streak += 1;
+        entry.best_streak = Math.max(entry.best_streak, entry.streak);
+        // Track median answer time only for first-try correct answers.
+        if (typeof elapsedMs === 'number' && elapsedMs > 0) {
+            entry.times.push(elapsedMs);
+            if (entry.times.length > TIMES_WINDOW) {
+                entry.times.shift();
+            }
+        }
+        // Advance Leitner box.
+        entry.box = Math.min(INTERVALS_SEC.length - 1, (entry.box || 0) + 1);
+    } else {
+        // Any non-first-try-correct attempt counts as wrong for stats and resets streak/box.
+        entry.wrong  += 1;
+        entry.streak = 0;
+        entry.box    = 0;
+    }
+
+    const intervalSec = INTERVALS_SEC[entry.box] || 0;
+    entry.next_due = new Date(Date.now() + intervalSec * 1000).toISOString();
+
+    data.facts[fact.key] = entry;
+    saveStats(data);
+
+    // recordAttempt is called exactly once per first-try answer (right,
+    // wrong, or skipped), so it's the right place to bump the day counter.
+    bumpDaily();
+    updateHUD();
+}
+
+// Game flow
+function newGame() {
+    deck       = selectDeck(TOTAL_ROUNDS);
+    index      = 0;
+    score      = 0;
+    asked      = 0;
+    streak     = 0;
+    bestStreak = 0;
+    results    = [];
+    awaitingNext  = false;
+    awaitingRetry = false;
+    awaitingStart = true;
+
+    showStartView();
+}
+
+function showStartView() {
+    document.getElementById('start-view').style.display = 'flex';
+    document.getElementById('quiz-view').style.display  = 'none';
+    document.getElementById('summary').style.display    = 'none';
+    document.getElementById('btn-hint').style.display   = 'none';
+    document.getElementById('btn-skip').style.display   = 'none';
+    document.getElementById('btn-action').textContent   = 'START  \u21b5';
+    document.getElementById('btn-action').disabled      = false;
+    updateHUD();
+}
+
+function showQuizView() {
+    document.getElementById('start-view').style.display = 'none';
+    document.getElementById('quiz-view').style.display  = 'flex';
+    document.getElementById('summary').style.display    = 'none';
+    document.getElementById('btn-hint').style.display   = '';
+    document.getElementById('btn-skip').style.display   = '';
+}
+
+function beginPlaying() {
+    awaitingStart = false;
+    showQuizView();
+    showCard();
+}
+
+function showCard() {
+    if (index >= deck.length) {
+        showSummary();
+        return;
+    }
+
+    currentFact = deck[index];
+    hintUsed     = false;
+    firstTryWrong = false;
+    awaitingNext = false;
+    awaitingRetry = false;
+
+    const problem = document.getElementById('problem');
+    problem.innerHTML =
+        `<span class="a">${currentFact.a}</span>` +
+        `<span class="op">×</span>` +
+        `<span class="b">${currentFact.b}</span>` +
+        `<span class="eq">=</span>` +
+        `<span class="qm">?</span>`;
+
+    const ht = document.getElementById('hint-text');
+    ht.innerHTML = '&nbsp;';
+
+    document.getElementById('feedback').textContent = '\u00a0';
+    document.getElementById('feedback').style.color = 'var(--muted)';
+    const reveal = document.getElementById('answer-reveal');
+    reveal.style.display = 'none';
+    document.getElementById('revealed-answer').textContent = '';
+
+    const inp = document.getElementById('answer-input');
+    inp.value     = '';
+    inp.disabled  = false;
+    inp.className = '';
+    setTimeout(() => inp.focus(), 30);
+
+    document.getElementById('btn-action').textContent = 'SUBMIT  \u21b5';
+    document.getElementById('btn-action').disabled    = false;
+
+    // Timing runs silently in the background; nothing is shown on screen
+    // while the child works on the problem.
+    questionShownAt = nowMs();
+
+    updateHUD();
+}
+
+function updateHUD() {
+    const displayIdx = Math.min(index + 1, deck.length);
+    document.getElementById('hud-round').textContent  =
+        `ROUND ${String(displayIdx).padStart(2,'0')} / ${String(deck.length).padStart(2,'0')}`;
+    document.getElementById('hud-today').textContent  = `TODAY ${loadDaily().count}`;
+    document.getElementById('hud-streak').textContent = `STREAK \u00d7${streak}`;
+    document.getElementById('hud-score').textContent  = `SCORE  ${String(score).padStart(3,'0')}`;
+}
+
+function onAction() {
+    if (awaitingStart) {
+        beginPlaying();
+    } else if (awaitingRetry) {
+        retryAnswer();
+    } else if (awaitingNext) {
+        index++;
+        showCard();
+    } else {
+        checkAnswer();
+    }
+}
+
+function parseAnswer(text) {
+    const t = (text || '').trim();
+    if (!/^-?\d+$/.test(t)) {
+        return NaN;
+    }
+    return parseInt(t, 10);
+}
+
+function checkAnswer() {
+    if (index >= deck.length) {
+        return;
+    }
+    const inp       = document.getElementById('answer-input');
+    const userVal   = parseAnswer(inp.value);
+    const isCorrect = userVal === currentFact.answer;
+    const elapsed   = nowMs() - questionShownAt;
+
+    if (isCorrect && !firstTryWrong) {
+        // First-try correct — record with elapsed time.
+        asked++;
+        results.push({
+            fact: currentFact,
+            user: inp.value,
+            is_correct: true,
+            first_try: true,
+            elapsed_ms: elapsed
+        });
+        recordAttempt(currentFact, true, true, elapsed);
+
+        // Score: 10 base + streak bonus + speed bonus.
+        let speedBonus = 0;
+        if (elapsed < 2000) {
+            speedBonus = 8;
+        } else if (elapsed < 4000) {
+            speedBonus = 4;
+        } else if (elapsed < 6000) {
+            speedBonus = 2;
+        }
+        score      += 10 + streak * 2 + speedBonus;
+        streak     += 1;
+        bestStreak  = Math.max(bestStreak, streak);
+
+        // Streak-milestone celebrations: small burst at 3 and 5, big at 10+.
+        if (streak === 3) {
+            celebrate('small');
+            showStreakToast('\u2728 3 IN A ROW!');
+        } else if (streak === 5) {
+            celebrate('small');
+            showStreakToast('\u{1F525} 5 IN A ROW!');
+        } else if (streak === 7) {
+            celebrate('big');
+            showStreakToast('\u26A1 7 IN A ROW!');
+        } else if (streak >= 10 && streak % 5 === 0) {
+            celebrate('big');
+            showStreakToast(`\u{1F31F} ${streak} IN A ROW!`);
+        }
+
+        const feedback = document.getElementById('feedback');
+        const secs     = (elapsed / 1000).toFixed(1);
+        let praise = 'CORRECT!';
+        if (elapsed < 2000) {
+            praise = `LIGHTNING! (${secs}s)`;
+        } else if (elapsed < 4000) {
+            praise = `NICE! (${secs}s)`;
+        } else {
+            praise = `CORRECT (${secs}s)`;
+        }
+        feedback.textContent = '\u2713  ' + praise;
+        feedback.style.color = 'var(--green)';
+        inp.className = 'correct';
+        inp.disabled  = true;
+
+        document.getElementById('btn-action').textContent = 'NEXT  \u21b5';
+        awaitingNext = true;
+        updateHUD();
+        return;
+    }
+
+    if (isCorrect && firstTryWrong) {
+        // They got it right on a retry — just move on, no extra recording
+        // (the wrong first-try attempt was already recorded).
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = '\u2713  Got it! Moving on\u2026';
+        feedback.style.color = 'var(--green)';
+        inp.className = 'correct';
+        inp.disabled  = true;
+        document.getElementById('btn-action').textContent = 'NEXT  \u21b5';
+        awaitingRetry = false;
+        awaitingNext  = true;
+        return;
+    }
+
+    // Wrong answer
+    if (!firstTryWrong) {
+        // First attempt was wrong — record as wrong.
+        asked++;
+        streak = 0;
+        firstTryWrong = true;
+        results.push({
+            fact: currentFact,
+            user: inp.value,
+            is_correct: false,
+            first_try: false,
+            elapsed_ms: elapsed
+        });
+        recordAttempt(currentFact, false, true, null);
+    }
+
+    const feedback = document.getElementById('feedback');
+    feedback.textContent = '\u2717  Not quite. Try again:';
+    feedback.style.color = 'var(--red)';
+    inp.className = 'wrong';
+
+    const reveal = document.getElementById('answer-reveal');
+    reveal.style.display = 'flex';
+    reveal.style.background = 'rgba(248,113,113,0.12)';
+    reveal.style.borderLeft = '3px solid var(--red)';
+    document.getElementById('answer-reveal-label').style.color = 'var(--red)';
+    const ra = document.getElementById('revealed-answer');
+    ra.textContent = `${currentFact.a} \u00d7 ${currentFact.b} = ${currentFact.answer}`;
+    ra.style.color = 'var(--red)';
+
+    inp.value = '';
+    inp.disabled = false;
+    inp.className = '';
+    inp.focus();
+
+    document.getElementById('btn-action').textContent = 'CHECK  \u21b5';
+    awaitingRetry = true;
+    updateHUD();
+}
+
+function retryAnswer() {
+    const inp       = document.getElementById('answer-input');
+    const userVal   = parseAnswer(inp.value);
+    const isCorrect = userVal === currentFact.answer;
+    const feedback  = document.getElementById('feedback');
+    if (isCorrect) {
+        feedback.textContent = '\u2713  Got it! Moving on\u2026';
+        feedback.style.color = 'var(--green)';
+        inp.className = 'correct';
+        inp.disabled  = true;
+        document.getElementById('btn-action').textContent = 'NEXT  \u21b5';
+        awaitingRetry = false;
+        awaitingNext  = true;
+    } else {
+        inp.value = '';
+        inp.className = 'wrong';
+        feedback.textContent = '\u2717  Not right \u2014 try again:';
+        feedback.style.color = 'var(--red)';
+        inp.focus();
+    }
+}
+
+function skipFact() {
+    if (awaitingNext) {
+        index++;
+        showCard();
+        return;
+    }
+    if (awaitingRetry) {
+        return;
+    }
+    if (index >= deck.length) {
+        return;
+    }
+
+    asked++;
+    streak = 0;
+    firstTryWrong = true;
+    results.push({
+        fact: currentFact,
+        user: '',
+        is_correct: false,
+        first_try: false,
+        skipped: true
+    });
+    recordAttempt(currentFact, false, true, null);
+
+    const inp = document.getElementById('answer-input');
+    inp.className = 'wrong';
+
+    document.getElementById('feedback').textContent = 'Skipped \u2014 now type it correctly:';
+    document.getElementById('feedback').style.color = 'var(--pink)';
+    const reveal = document.getElementById('answer-reveal');
+    reveal.style.display = 'flex';
+    reveal.style.background = 'rgba(244,114,182,0.12)';
+    reveal.style.borderLeft = '3px solid var(--pink)';
+    document.getElementById('answer-reveal-label').style.color = 'var(--pink)';
+    const ra = document.getElementById('revealed-answer');
+    ra.textContent = `${currentFact.a} \u00d7 ${currentFact.b} = ${currentFact.answer}`;
+    ra.style.color = 'var(--pink)';
+
+    document.getElementById('btn-action').textContent = 'CHECK  \u21b5';
+    inp.value = '';
+    inp.disabled = false;
+    inp.className = '';
+    inp.focus();
+    awaitingRetry = true;
+    updateHUD();
+}
+
+function showHint() {
+    if (awaitingNext || index >= deck.length) {
+        return;
+    }
+    hintUsed = true;
+    const f = currentFact;
+    // Friendly hint: break the larger factor into 10 + remainder, e.g. 7 × 8 = 7×10 − 7×2.
+    let hint;
+    if (f.a === 0 || f.b === 0) {
+        hint = `Anything times 0 is 0`;
+    } else if (f.a === 1 || f.b === 1) {
+        hint = `Anything times 1 stays the same`;
+    } else if (f.a === 10 || f.b === 10) {
+        const other = f.a === 10 ? f.b : f.a;
+        hint = `${other} \u00d7 10 = ${other}0`;
+    } else if (f.a === 11 || f.b === 11) {
+        const other = f.a === 11 ? f.b : f.a;
+        hint = `${other} \u00d7 11: think ${other} \u00d7 10 + ${other}`;
+    } else if (f.a === 9 || f.b === 9) {
+        const other = f.a === 9 ? f.b : f.a;
+        hint = `${other} \u00d7 9: think ${other} \u00d7 10 \u2212 ${other}`;
+    } else if (f.a === 5 || f.b === 5) {
+        const other = f.a === 5 ? f.b : f.a;
+        hint = `${other} \u00d7 5: half of ${other} \u00d7 10`;
+    } else if (f.a === f.b) {
+        hint = `It\u2019s a square: ${f.a} \u00d7 ${f.a}`;
+    } else if (f.a === 2 || f.b === 2) {
+        const other = f.a === 2 ? f.b : f.a;
+        hint = `${other} \u00d7 2: double ${other}`;
+    } else if (f.a === 4 || f.b === 4) {
+        const other = f.a === 4 ? f.b : f.a;
+        hint = `${other} \u00d7 4: double ${other}, then double again`;
+    } else {
+        hint = `Break it up: ${f.a} \u00d7 ${f.b} = ${f.a} \u00d7 (${f.b - 1}) + ${f.a}`;
+    }
+    const ht = document.getElementById('hint-text');
+    ht.innerHTML = `\u{1F4A1} ${hint}`;
+}
+
+// Summary
+function showSummary() {
+    document.getElementById('quiz-view').style.display = 'none';
+    document.getElementById('summary').style.display   = 'flex';
+    document.getElementById('btn-hint').style.display  = 'none';
+    document.getElementById('btn-skip').style.display  = 'none';
+    document.getElementById('btn-action').textContent  = 'NEW GAME';
+    document.getElementById('btn-action').disabled     = false;
+
+    const right = results.filter(r =>  r.is_correct);
+    const wrong = results.filter(r => !r.is_correct);
+
+    // Perfect game! Show the shimmering banner and rip off the big fireworks.
+    const banner = document.getElementById('perfect-banner');
+    const isPerfect = asked > 0 && wrong.length === 0 && right.length === deck.length;
+    if (isPerfect) {
+        // Re-trigger the pop animation by toggling the class off and back on.
+        banner.classList.remove('show');
+        void banner.offsetWidth;
+        banner.classList.add('show');
+        celebrate('perfect');
+        showStreakToast('\u{1F389} PERFECT GAME!');
+    } else {
+        banner.classList.remove('show');
+        // A near-perfect game (8 or 9 / 10) still earns a small celebration.
+        if (asked >= 5 && right.length / asked >= 0.8) {
+            celebrate('small');
+        }
+    }
+
+    document.getElementById('summary-score').textContent =
+        `FINAL SCORE  ${String(score).padStart(4,'0')}`;
+    document.getElementById('summary-meta').textContent =
+        `${right.length} / ${asked} correct  \u00b7  best streak \u00d7${bestStreak}`;
+
+    document.querySelector('#summary-cols .summary-col:first-child h3').textContent =
+        `\u2713 CORRECT (${right.length})`;
+    document.querySelector('#summary-cols .summary-col:last-child h3').textContent =
+        `\u2717 MISSED (${wrong.length})`;
+
+    const rBox = document.getElementById('summary-right');
+    const wBox = document.getElementById('summary-wrong');
+    rBox.innerHTML = '';
+    wBox.innerHTML = '';
+
+    if (right.length === 0) {
+        rBox.innerHTML = '<div style="color:var(--muted);font-size:.85rem;padding:6px 0;">(none)</div>';
+    } else {
+        for (const r of right) {
+            const div = document.createElement('div');
+            div.className = 'summary-fact';
+            const secs = (r.elapsed_ms / 1000).toFixed(1);
+            div.innerHTML =
+                `${r.fact.a} &times; ${r.fact.b} = ${r.fact.answer} ` +
+                `<span class="meta">${secs}s</span>`;
+            rBox.appendChild(div);
+        }
+    }
+
+    if (wrong.length === 0) {
+        wBox.innerHTML = '<div style="color:var(--green);font-size:.85rem;padding:6px 0;">(perfect game!)</div>';
+    } else {
+        for (const r of wrong) {
+            const div = document.createElement('div');
+            div.className = 'summary-fact missed';
+            const typed = r.skipped || !r.user ? '(skipped)' : `you typed: ${r.user}`;
+            div.innerHTML =
+                `${r.fact.a} &times; ${r.fact.b} = ${r.fact.answer}<br>` +
+                `<span class="meta">${typed}</span>`;
+            wBox.appendChild(div);
+        }
+    }
+
+    updateHUD();
+}
+
+// Stats modal
+function openStats() {
+    const data = loadStats();
+    const rows = buildStatsRows(data);
+
+    const totalFacts   = (MAX_FACTOR - MIN_FACTOR + 1) ** 2;
+    const seenRows     = rows.filter(r => r.attempts > 0);
+    const mastered     = seenRows.filter(r => r.state === 'mastered').length;
+    const learning     = seenRows.filter(r => r.state === 'learning').length;
+    const struggling   = seenRows.filter(r => r.state === 'struggling').length;
+    const totalTries   = seenRows.reduce((s, r) => s + r.attempts, 0);
+    const totalRight   = seenRows.reduce((s, r) => s + r.right, 0);
+    const overall      = totalTries ? Math.round(100 * totalRight / totalTries) : 0;
+
+    const medsAll      = seenRows.map(r => r.median).filter(v => v !== null);
+    const overallMed   = medsAll.length ? median(medsAll) : null;
+
+    const medText = overallMed !== null
+        ? `overall median ${(overallMed / 1000).toFixed(1)}s`
+        : 'no timings yet';
+
+    document.getElementById('stats-summary-line').textContent =
+        `${mastered}/${totalFacts} mastered \u00b7 ${learning} learning \u00b7 ${struggling} need practice \u00b7 ${overall}% accuracy \u00b7 ${medText}`;
+
+    renderGrid(rows);
+    renderStatsTable(rows);
+    document.getElementById('stats-overlay').classList.add('open');
+}
+
+function buildStatsRows(data) {
+    return allFacts().map(f => {
+        const e = data.facts[f.key] || emptyEntry();
+        const med = median(e.times);
+        const acc = e.attempts ? e.right / e.attempts : 0;
+        return {
+            fact:      f,
+            key:       f.key,
+            label:     `${f.a} \u00d7 ${f.b}`,
+            attempts:  e.attempts,
+            right:     e.right,
+            wrong:     e.wrong,
+            accuracy:  acc,
+            median:    med,
+            last_seen: e.last_seen || '',
+            state:     classify(e)
+        };
+    });
+}
+
+function renderGrid(rows) {
+    const grid = document.getElementById('fact-grid');
+    grid.innerHTML = '';
+
+    // Top-left empty corner
+    const corner = document.createElement('div');
+    corner.className = 'gh';
+    corner.textContent = '\u00d7';
+    grid.appendChild(corner);
+
+    // Column headers (b values)
+    for (let b = MIN_FACTOR; b <= MAX_FACTOR; b++) {
+        const cell = document.createElement('div');
+        cell.className = 'gh';
+        cell.textContent = b;
+        grid.appendChild(cell);
+    }
+
+    const lookup = {};
+    for (const r of rows) {
+        lookup[r.key] = r;
+    }
+
+    for (let a = MIN_FACTOR; a <= MAX_FACTOR; a++) {
+        const rh = document.createElement('div');
+        rh.className = 'gv';
+        rh.textContent = a;
+        grid.appendChild(rh);
+        for (let b = MIN_FACTOR; b <= MAX_FACTOR; b++) {
+            const r = lookup[factKey(a, b)];
+            const cell = document.createElement('div');
+            cell.className = 'cell ' + (r.state === 'new' ? '' : r.state);
+            cell.textContent = a * b;
+            const medText = r.median !== null
+                ? `median ${(r.median / 1000).toFixed(1)}s`
+                : 'no timing yet';
+            const accText = r.attempts
+                ? `${Math.round(r.accuracy * 100)}% (${r.right}/${r.attempts})`
+                : 'not seen yet';
+            cell.title = `${r.label} = ${a * b}\n${accText}\n${medText}`;
+            grid.appendChild(cell);
+        }
+    }
+}
+
+function renderStatsTable(rows) {
+    const stateOrder = { struggling: 0, learning: 1, mastered: 2, new: 3 };
+
+    rows.sort((a, b) => {
+        let va = a[sortCol];
+        let vb = b[sortCol];
+        if (sortCol === 'state') {
+            va = stateOrder[a.state];
+            vb = stateOrder[b.state];
+        } else if (sortCol === 'fact') {
+            va = a.fact.a * 100 + a.fact.b;
+            vb = b.fact.a * 100 + b.fact.b;
+        } else if (sortCol === 'median') {
+            // Treat null medians as very large so they sort to the end ascending.
+            va = a.median === null ? Number.POSITIVE_INFINITY : a.median;
+            vb = b.median === null ? Number.POSITIVE_INFINITY : b.median;
+        } else if (typeof va === 'string') {
+            va = va.toLowerCase();
+            vb = (vb || '').toLowerCase();
+        }
+        if (va < vb) {
+            return sortAsc ? -1 : 1;
+        }
+        if (va > vb) {
+            return sortAsc ? 1 : -1;
+        }
+        return 0;
+    });
+
+    document.querySelectorAll('#stats-table thead th').forEach(th => {
+        th.classList.toggle('sorted', th.dataset.col === sortCol);
+        const arrow = th.querySelector('.sort-arrow');
+        if (th.dataset.col === sortCol) {
+            arrow.textContent = sortAsc ? '\u2191' : '\u2193';
+        } else {
+            arrow.textContent = '\u2195';
+        }
+    });
+
+    const tbody = document.getElementById('stats-tbody');
+    tbody.innerHTML = '';
+    if (rows.length === 0) {
+        const tr = document.createElement('tr');
+        tr.innerHTML = '<td colspan="8" style="color:var(--muted);padding:20px;text-align:center;">No data yet \u2014 play a game!</td>';
+        tbody.appendChild(tr);
+        return;
+    }
+
+    for (const r of rows) {
+        const pct    = r.attempts ? Math.round(r.accuracy * 100) : 0;
+        const accCls = r.attempts === 0
+            ? ''
+            : (r.accuracy >= .85 ? 'acc-high' : r.accuracy >= .55 ? 'acc-mid' : 'acc-low');
+        const last   = r.last_seen ? r.last_seen.slice(0, 10) : '\u2014';
+        const med    = r.median !== null ? `${(r.median / 1000).toFixed(1)}s` : '\u2014';
+        const stateLbl = {
+            mastered:   'Mastered',
+            learning:   'Learning',
+            struggling: 'Practice',
+            new:        'Not seen'
+        }[r.state];
+        const accCell = r.attempts === 0
+            ? '<td style="color:var(--muted)">\u2014</td>'
+            : `<td class="acc-cell ${accCls}">${pct}%</td>`;
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td class="fact-cell">${r.label} = ${r.fact.answer}</td>
+            <td class="state-${r.state}">${stateLbl}</td>
+            <td>${r.attempts || '\u2014'}</td>
+            <td style="color:var(--green)">${r.right || 0}</td>
+            <td style="color:var(--red)">${r.wrong || 0}</td>
+            ${accCell}
+            <td>${med}</td>
+            <td style="color:var(--muted)">${last}</td>`;
+        tbody.appendChild(tr);
+    }
+}
+
+function switchStatsView(view) {
+    activeStatsView = view;
+    document.querySelectorAll('#stats-tabs button').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.view === view);
+    });
+    document.getElementById('stats-view-grid').style.display  = view === 'grid'  ? '' : 'none';
+    document.getElementById('stats-view-table').style.display = view === 'table' ? '' : 'none';
+}
+
+// Bootstrap
+async function init() {
+    await syncOnStartup();
+    newGame();
+}
+
+// Event wiring
+document.getElementById('btn-action').addEventListener('click', () => {
+    if (document.getElementById('summary').style.display !== 'none') {
+        newGame();
+    } else {
+        onAction();
+    }
+});
+document.getElementById('btn-new-game').addEventListener('click', newGame);
+document.getElementById('btn-hint').addEventListener('click', showHint);
+document.getElementById('btn-skip').addEventListener('click', skipFact);
+document.getElementById('btn-stats').addEventListener('click', openStats);
+document.getElementById('btn-close-stats').addEventListener('click', () => {
+    document.getElementById('stats-overlay').classList.remove('open');
+});
+document.getElementById('stats-overlay').addEventListener('click', (e) => {
+    if (e.target === document.getElementById('stats-overlay')) {
+        document.getElementById('stats-overlay').classList.remove('open');
+    }
+});
+
+document.querySelectorAll('#stats-tabs button').forEach(btn => {
+    btn.addEventListener('click', () => switchStatsView(btn.dataset.view));
+});
+
+document.querySelectorAll('#stats-table thead th').forEach(th => {
+    th.addEventListener('click', () => {
+        const col = th.dataset.col;
+        if (sortCol === col) {
+            sortAsc = !sortAsc;
+        } else {
+            sortCol = col;
+            sortAsc = (col === 'fact' || col === 'state');
+        }
+        const data = loadStats();
+        renderStatsTable(buildStatsRows(data));
+    });
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        const inp = document.getElementById('answer-input');
+        if (e.target !== inp) {
+            e.preventDefault();
+            if (document.getElementById('summary').style.display !== 'none') {
+                newGame();
+            } else {
+                onAction();
+            }
+        }
+    }
+    if (e.key === 'Escape') {
+        document.getElementById('stats-overlay').classList.remove('open');
+    }
+});
+
+document.getElementById('answer-input').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') {
+        e.preventDefault();
+        onAction();
+    }
+});
+
+// Restrict input to digits only (allow editing keys).
+document.getElementById('answer-input').addEventListener('input', (e) => {
+    const cleaned = e.target.value.replace(/[^\d]/g, '');
+    if (cleaned !== e.target.value) {
+        e.target.value = cleaned;
+    }
+});
+
+// Celebration engine — fireworks bursts + confetti rain on a fullscreen
+// canvas overlay, plus a transient streak toast.
+const PARTY_COLORS = ['#f472b6', '#facc15', '#4ade80', '#22d3ee', '#a78bfa', '#fb923c', '#ffffff'];
+const confettiCanvas = document.getElementById('confetti-canvas');
+const cctx = confettiCanvas.getContext('2d');
+let particles = [];
+let animatingParty = false;
+let toastTimer = null;
+
+function sizeConfettiCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    confettiCanvas.width  = window.innerWidth  * dpr;
+    confettiCanvas.height = window.innerHeight * dpr;
+    confettiCanvas.style.width  = window.innerWidth  + 'px';
+    confettiCanvas.style.height = window.innerHeight + 'px';
+    cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+}
+window.addEventListener('resize', sizeConfettiCanvas);
+sizeConfettiCanvas();
+
+function spawnBurst(x, y, count, speed) {
+    for (let i = 0; i < count; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        const v = speed * (0.4 + Math.random() * 0.8);
+        particles.push({
+            x: x, y: y,
+            vx: Math.cos(angle) * v,
+            vy: Math.sin(angle) * v - 2,
+            color: PARTY_COLORS[Math.floor(Math.random() * PARTY_COLORS.length)],
+            size: 4 + Math.random() * 5,
+            rotation: Math.random() * Math.PI * 2,
+            vr: (Math.random() - 0.5) * 0.4,
+            life: 1,
+            decay: 0.012 + Math.random() * 0.008,
+            gravity: 0.18,
+            shape: Math.random() < 0.5 ? 'rect' : 'circle'
+        });
+    }
+    startPartyLoop();
+}
+
+function spawnConfettiRain(count) {
+    const W = window.innerWidth;
+    for (let i = 0; i < count; i++) {
+        particles.push({
+            x: Math.random() * W,
+            y: -20 - Math.random() * 200,
+            vx: (Math.random() - 0.5) * 3,
+            vy: 2 + Math.random() * 4,
+            color: PARTY_COLORS[Math.floor(Math.random() * PARTY_COLORS.length)],
+            size: 6 + Math.random() * 6,
+            rotation: Math.random() * Math.PI * 2,
+            vr: (Math.random() - 0.5) * 0.25,
+            life: 1,
+            decay: 0.003,
+            gravity: 0.05,
+            shape: 'rect'
+        });
+    }
+    startPartyLoop();
+}
+
+function startPartyLoop() {
+    if (animatingParty) {
+        return;
+    }
+    animatingParty = true;
+    requestAnimationFrame(stepParty);
+}
+
+function stepParty() {
+    const H = window.innerHeight;
+    cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+    for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.vy += p.gravity;
+        p.x  += p.vx;
+        p.y  += p.vy;
+        p.rotation += p.vr;
+        p.life -= p.decay;
+        if (p.life <= 0 || p.y > H + 60) {
+            particles.splice(i, 1);
+            continue;
+        }
+        cctx.save();
+        cctx.globalAlpha = Math.max(0, p.life);
+        cctx.translate(p.x, p.y);
+        cctx.rotate(p.rotation);
+        cctx.fillStyle = p.color;
+        if (p.shape === 'rect') {
+            cctx.fillRect(-p.size / 2, -p.size / 2, p.size, p.size * 0.6);
+        } else {
+            cctx.beginPath();
+            cctx.arc(0, 0, p.size / 2, 0, Math.PI * 2);
+            cctx.fill();
+        }
+        cctx.restore();
+    }
+    if (particles.length === 0) {
+        animatingParty = false;
+        cctx.clearRect(0, 0, confettiCanvas.width, confettiCanvas.height);
+        return;
+    }
+    requestAnimationFrame(stepParty);
+}
+
+function celebrate(level) {
+    const W = window.innerWidth;
+    const H = window.innerHeight;
+    if (level === 'small') {
+        spawnBurst(W * 0.5, H * 0.55, 28, 7);
+    } else if (level === 'big') {
+        spawnBurst(W * 0.3, H * 0.45, 45, 9);
+        spawnBurst(W * 0.7, H * 0.45, 45, 9);
+    } else if (level === 'perfect') {
+        // Five fireworks bursts over ~1.2s, then two waves of confetti rain.
+        const fire = (delay, xFrac, yFrac) => {
+            setTimeout(() => spawnBurst(W * xFrac, H * yFrac, 55, 11), delay);
+        };
+        fire(0,    0.25, 0.35);
+        fire(220,  0.75, 0.32);
+        fire(440,  0.50, 0.25);
+        fire(660,  0.35, 0.42);
+        fire(880,  0.65, 0.42);
+        fire(1100, 0.50, 0.30);
+        setTimeout(() => spawnConfettiRain(150), 500);
+        setTimeout(() => spawnConfettiRain(120), 1800);
+        setTimeout(() => spawnConfettiRain(80),  3200);
+    }
+}
+
+function showStreakToast(text) {
+    const t = document.getElementById('streak-toast');
+    t.textContent = text;
+    t.classList.add('show');
+    if (toastTimer) {
+        clearTimeout(toastTimer);
+    }
+    toastTimer = setTimeout(() => {
+        t.classList.remove('show');
+    }, 1400);
+}
+
+init();
+</script>
+</body>
+</html>
