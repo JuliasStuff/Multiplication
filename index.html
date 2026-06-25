@@ -60,6 +60,22 @@
   #hud-today  { color: var(--accent-2); font-weight: bold; font-size: .85rem; letter-spacing: .06em; }
   #hud-streak { color: var(--gold);   font-weight: bold; font-size: .85rem; letter-spacing: .06em; }
   #hud-score  { color: var(--pink);   font-weight: bold; font-size: .85rem; letter-spacing: .06em; margin-left: auto; }
+  #hud-sync   {
+    color: var(--muted);
+    font-weight: bold;
+    font-size: .85rem;
+    letter-spacing: .06em;
+    cursor: pointer;
+    user-select: none;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid transparent;
+  }
+  #hud-sync:hover { border-color: var(--muted); }
+  #hud-sync.state-ok      { color: var(--green); }
+  #hud-sync.state-syncing { color: var(--accent-2); }
+  #hud-sync.state-error   { color: var(--red); }
+  #hud-sync.state-off     { color: var(--muted); }
 
   .hud-divider { height: 2px; background: var(--accent); margin: 0 24px; }
 
@@ -560,6 +576,7 @@
   <span id="hud-today">TODAY 0</span>
   <span id="hud-streak">STREAK ×0</span>
   <span id="hud-score">SCORE  000</span>
+  <span id="hud-sync" class="state-off" title="Click for sync details">SYNC …</span>
 </div>
 <div class="hud-divider"></div>
 
@@ -847,11 +864,35 @@ function classify(entry) {
 }
 
 // Cross-device sync (JSONBin.io)
+let syncReady       = false;   // becomes true once initial pull (or merge) finishes
+let pushTimer       = null;
+let pendingPushData = null;
+let lastSyncAt      = null;
+let lastSyncError   = '';
+
 function syncEnabled() {
     return JSONBIN_BIN_ID
         && !JSONBIN_BIN_ID.startsWith('REPLACE_')
         && JSONBIN_ACCESS_KEY
         && !JSONBIN_ACCESS_KEY.startsWith('REPLACE_');
+}
+
+function setSyncStatus(state, message) {
+    const el = document.getElementById('hud-sync');
+    if (!el) {
+        return;
+    }
+    el.classList.remove('state-ok', 'state-syncing', 'state-error', 'state-off');
+    el.classList.add(`state-${state}`);
+    let label;
+    switch (state) {
+        case 'ok':      label = 'SYNC ✓'; break;
+        case 'syncing': label = 'SYNC ⟳'; break;
+        case 'error':   label = 'SYNC ✗'; break;
+        default:        label = 'SYNC OFF';
+    }
+    el.textContent = label;
+    el.title       = message || label;
 }
 
 function mergeStats(a, b) {
@@ -908,7 +949,9 @@ async function pullRemote() {
             headers: { 'X-Access-Key': JSONBIN_ACCESS_KEY }
         });
         if (!res.ok) {
-            return null;
+            const text = await res.text().catch(() => '');
+            lastSyncError = `pull HTTP ${res.status}: ${text.slice(0, 200)}`;
+            throw new Error(lastSyncError);
         }
         const body = await res.json();
         const data = body && body.record;
@@ -916,8 +959,11 @@ async function pullRemote() {
             return data;
         }
         return null;
-    } catch {
-        return null;
+    } catch (err) {
+        if (!lastSyncError) {
+            lastSyncError = `pull failed: ${err && err.message ? err.message : err}`;
+        }
+        throw err;
     }
 }
 
@@ -925,28 +971,74 @@ async function pushRemote(data) {
     if (!syncEnabled()) {
         return;
     }
-    try {
-        await fetch(JSONBIN_URL, {
-            method:  'PUT',
-            headers: {
-                'Content-Type': 'application/json',
-                'X-Access-Key': JSONBIN_ACCESS_KEY
-            },
-            body: JSON.stringify(data)
-        });
-    } catch {}
+    // Guard against pushing before the initial pull completes — otherwise
+    // we'd overwrite the remote with local-only data on every PC startup.
+    if (!syncReady) {
+        pendingPushData = data;
+        return;
+    }
+    // Debounce: coalesce rapid saves during a quiz round.
+    pendingPushData = data;
+    if (pushTimer) {
+        return;
+    }
+    pushTimer = setTimeout(async () => {
+        const payload = pendingPushData;
+        pushTimer       = null;
+        pendingPushData = null;
+        setSyncStatus('syncing', 'Uploading…');
+        try {
+            const res = await fetch(JSONBIN_URL, {
+                method:  'PUT',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Access-Key': JSONBIN_ACCESS_KEY
+                },
+                body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+                const text = await res.text().catch(() => '');
+                lastSyncError = `push HTTP ${res.status}: ${text.slice(0, 200)}`;
+                setSyncStatus('error', lastSyncError);
+                return;
+            }
+            lastSyncAt    = new Date();
+            lastSyncError = '';
+            setSyncStatus('ok', `Last sync: ${lastSyncAt.toLocaleTimeString()}`);
+        } catch (err) {
+            lastSyncError = `push failed: ${err && err.message ? err.message : err}`;
+            setSyncStatus('error', lastSyncError);
+        }
+    }, 1500);
 }
 
 async function syncOnStartup() {
-    const remote = await pullRemote();
-    if (!remote) {
+    if (!syncEnabled()) {
+        setSyncStatus('off', 'Cross-device sync disabled (no JSONBin credentials).');
+        syncReady = true;
+        return;
+    }
+    setSyncStatus('syncing', 'Downloading remote data…');
+    let remote = null;
+    try {
+        remote = await pullRemote();
+    } catch {
+        // pullRemote already set lastSyncError
+        setSyncStatus('error', lastSyncError || 'Could not reach JSONBin.');
+        // Still mark ready so subsequent saves can attempt push (which will also surface errors).
+        syncReady = true;
         return;
     }
     const local  = loadStats();
-    const merged = mergeStats(local, remote);
+    const merged = remote ? mergeStats(local, remote) : local;
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     } catch {}
+    syncReady = true;
+    lastSyncAt    = new Date();
+    lastSyncError = '';
+    setSyncStatus('ok', `Last sync: ${lastSyncAt.toLocaleTimeString()}`);
+    // Push the merged result so the other side gets it too.
     pushRemote(merged);
 }
 
@@ -1723,6 +1815,57 @@ document.getElementById('btn-skip').addEventListener('click', skipFact);
 document.getElementById('btn-stats').addEventListener('click', openStats);
 document.getElementById('btn-close-stats').addEventListener('click', () => {
     document.getElementById('stats-overlay').classList.remove('open');
+});
+
+// Tap sync indicator: show details and force a manual sync.
+document.getElementById('hud-sync').addEventListener('click', async () => {
+    const details = [
+        `Sync: ${syncEnabled() ? 'enabled' : 'disabled (no credentials)'}`,
+        `Bin: ${JSONBIN_BIN_ID || '(none)'}`,
+        `Last successful sync: ${lastSyncAt ? lastSyncAt.toLocaleString() : 'never'}`,
+        `Last error: ${lastSyncError || '(none)'}`,
+        '',
+        'Click OK to force a sync now.'
+    ].join('\n');
+    if (!syncEnabled()) {
+        alert(details);
+        return;
+    }
+    if (!confirm(details)) {
+        return;
+    }
+    setSyncStatus('syncing', 'Manual sync\u2026');
+    try {
+        const remote = await pullRemote();
+        const local  = loadStats();
+        const merged = remote ? mergeStats(local, remote) : local;
+        try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch {}
+        syncReady = true;
+        // Force-push immediately (bypass debounce by clearing timer).
+        if (pushTimer) { clearTimeout(pushTimer); pushTimer = null; }
+        pendingPushData = merged;
+        // Trigger a push with no delay by inlining the PUT here.
+        const res = await fetch(JSONBIN_URL, {
+            method:  'PUT',
+            headers: { 'Content-Type': 'application/json', 'X-Access-Key': JSONBIN_ACCESS_KEY },
+            body:    JSON.stringify(merged)
+        });
+        if (!res.ok) {
+            const text = await res.text().catch(() => '');
+            lastSyncError = `push HTTP ${res.status}: ${text.slice(0, 200)}`;
+            setSyncStatus('error', lastSyncError);
+            return;
+        }
+        pendingPushData = null;
+        lastSyncAt    = new Date();
+        lastSyncError = '';
+        setSyncStatus('ok', `Last sync: ${lastSyncAt.toLocaleTimeString()}`);
+        alert('Sync successful.');
+    } catch (err) {
+        lastSyncError = `manual sync failed: ${err && err.message ? err.message : err}`;
+        setSyncStatus('error', lastSyncError);
+        alert(lastSyncError);
+    }
 });
 document.getElementById('stats-overlay').addEventListener('click', (e) => {
     if (e.target === document.getElementById('stats-overlay')) {
