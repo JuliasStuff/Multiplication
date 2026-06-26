@@ -834,7 +834,36 @@ function migrateLegacyDaily(data) {
             localStorage.removeItem(DAILY_KEY);
         }
     } catch {}
+    fixFutureDailyKeys(data);
     return data;
+}
+
+// Before todayKey() switched to PST, evening sessions were stored under the
+// next UTC date. After the switch those counts are stranded under a key that
+// is "tomorrow in PST" and never read again. UTC is at most 1 day ahead of
+// PST, so any key dated exactly one day after today PST is the misclassified
+// previous-evening session and gets shifted back to today.
+function fixFutureDailyKeys(data) {
+    if (!data || !data.daily) {
+        return;
+    }
+    const today    = todayKey();
+    const tomorrow = addDaysIso(today, 1);
+    const count    = data.daily[tomorrow] || 0;
+    if (count <= 0) {
+        return;
+    }
+    delete data.daily[tomorrow];
+    const existing = data.daily[today] || 0;
+    if (count > existing) {
+        data.daily[today] = count;
+    }
+}
+
+function addDaysIso(isoDate, delta) {
+    const d = new Date(isoDate + 'T12:00:00Z');
+    d.setUTCDate(d.getUTCDate() + delta);
+    return d.toISOString().slice(0, 10);
 }
 
 function saveStats(data) {
@@ -1062,6 +1091,9 @@ async function syncOnStartup() {
     }
     const local  = loadStats();
     const merged = remote ? mergeStats(local, remote) : local;
+    // Remote may still carry future-dated daily keys written before the PST
+    // switch; rewrite them so today's count actually shows up.
+    fixFutureDailyKeys(merged);
     try {
         localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
     } catch {}
@@ -1870,6 +1902,7 @@ document.getElementById('hud-sync').addEventListener('click', async () => {
         const remote = await pullRemote();
         const local  = loadStats();
         const merged = remote ? mergeStats(local, remote) : local;
+        fixFutureDailyKeys(merged);
         try { localStorage.setItem(STORAGE_KEY, JSON.stringify(merged)); } catch {}
         syncReady = true;
         // Force-push immediately (bypass debounce by clearing timer).
