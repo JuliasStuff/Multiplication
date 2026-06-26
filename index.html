@@ -767,54 +767,74 @@ function emptyEntry() {
     };
 }
 
-// Daily round counter — resets at local midnight.
+// Daily round counter — resets at PST midnight so it behaves consistently
+// across devices and time zones.
 function todayKey() {
-    const d = new Date();
-    const y = d.getFullYear();
-    const m = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${y}-${m}-${day}`;
+    return new Intl.DateTimeFormat('en-CA', {
+        timeZone: 'America/Los_Angeles',
+        year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
 }
 
 function loadDaily() {
-    try {
-        const raw = localStorage.getItem(DAILY_KEY);
-        if (!raw) {
-            return { date: todayKey(), count: 0 };
-        }
-        const data = JSON.parse(raw);
-        if (!data || data.date !== todayKey()) {
-            return { date: todayKey(), count: 0 };
-        }
-        return { date: data.date, count: data.count || 0 };
-    } catch {
-        return { date: todayKey(), count: 0 };
-    }
+    const data = loadStats();
+    const key  = todayKey();
+    return { date: key, count: (data.daily && data.daily[key]) || 0 };
 }
 
 function bumpDaily() {
-    const d = loadDaily();
-    d.count += 1;
-    try {
-        localStorage.setItem(DAILY_KEY, JSON.stringify(d));
-    } catch {}
-    return d.count;
+    const data = loadStats();
+    if (!data.daily || typeof data.daily !== 'object') {
+        data.daily = {};
+    }
+    const key = todayKey();
+    data.daily[key] = (data.daily[key] || 0) + 1;
+    saveStats(data);
+    return data.daily[key];
 }
 
 function loadStats() {
     try {
         const raw = localStorage.getItem(STORAGE_KEY);
         if (!raw) {
-            return { facts: {} };
+            return migrateLegacyDaily({ facts: {}, daily: {} });
         }
         const data = JSON.parse(raw);
         if (!data || typeof data.facts !== 'object') {
-            return { facts: {} };
+            return migrateLegacyDaily({ facts: {}, daily: {} });
         }
-        return data;
+        if (!data.daily || typeof data.daily !== 'object') {
+            data.daily = {};
+        }
+        return migrateLegacyDaily(data);
     } catch {
-        return { facts: {} };
+        return migrateLegacyDaily({ facts: {}, daily: {} });
     }
+}
+
+// One-time migration: fold the legacy single-day DAILY_KEY entry into
+// stats.daily so today's count survives the new sync flow.
+let legacyDailyMigrated = false;
+function migrateLegacyDaily(data) {
+    if (legacyDailyMigrated) {
+        return data;
+    }
+    legacyDailyMigrated = true;
+    try {
+        const raw = localStorage.getItem(DAILY_KEY);
+        if (raw) {
+            const old = JSON.parse(raw);
+            if (old && old.date && typeof old.count === 'number' && old.count > 0) {
+                data.daily = data.daily || {};
+                const existing = data.daily[old.date] || 0;
+                if (old.count > existing) {
+                    data.daily[old.date] = old.count;
+                }
+            }
+            localStorage.removeItem(DAILY_KEY);
+        }
+    } catch {}
+    return data;
 }
 
 function saveStats(data) {
@@ -896,7 +916,7 @@ function setSyncStatus(state, message) {
 }
 
 function mergeStats(a, b) {
-    const out = { facts: {} };
+    const out = { facts: {}, daily: {} };
     const keys = new Set([
         ...Object.keys(a.facts || {}),
         ...Object.keys(b.facts || {})
@@ -918,6 +938,17 @@ function mergeStats(a, b) {
             last_seen:  maxDate(x.last_seen,  y.last_seen),
             next_due:   maxDate(x.next_due,   y.next_due)
         };
+    }
+    // Merge daily counters: take the max per day so we never lose work
+    // if two PCs both ran some problems on the same date.
+    const dayKeys = new Set([
+        ...Object.keys(a.daily || {}),
+        ...Object.keys(b.daily || {})
+    ]);
+    for (const d of dayKeys) {
+        const ax = (a.daily && a.daily[d]) || 0;
+        const bx = (b.daily && b.daily[d]) || 0;
+        out.daily[d] = Math.max(ax, bx);
     }
     return out;
 }
