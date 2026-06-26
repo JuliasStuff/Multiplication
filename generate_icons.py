@@ -108,10 +108,52 @@ def make_icon(size: int) -> None:
     print(f"  Created {path}  ({size}x{size})")
 
 
+def make_favicon_ico() -> None:
+    """Create favicon.ico containing 16, 32, and 48 px variants."""
+    # Render at a larger size and downsample for crisp small icons.
+    base = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(base)
+
+    size = 256
+    radius = size // 6
+    draw.rounded_rectangle(
+        [0, 0, size - 1, size - 1],
+        radius=radius,
+        fill=BG_COLOR,
+    )
+
+    cx, cy = size / 2, size / 2
+    font_px = int(size * 0.56)
+    font = find_font(font_px)
+
+    offset_x = size * 0.30
+    y_letter = cy + size * 0.02
+
+    draw.text((cx - offset_x, y_letter), "M", font=font,
+              fill=LETTER_COLOR, anchor="mm")
+    draw.text((cx + offset_x, y_letter), "Q", font=font,
+              fill=LETTER_COLOR, anchor="mm")
+
+    arm       = size * 0.14
+    thickness = size * 0.055
+    draw_x(draw, cx, cy, arm, thickness, ACCENT_COLOR)
+
+    sizes = [(16, 16), (32, 32), (48, 48), (64, 64)]
+    # Save individual PNGs for direct <link rel="icon"> use.
+    for w, _ in [(16, 16), (32, 32)]:
+        resized = base.resize((w, w), Image.LANCZOS)
+        resized.save(f"favicon-{w}.png")
+        print(f"  Created favicon-{w}.png  ({w}x{w})")
+
+    base.save("favicon.ico", format="ICO", sizes=sizes)
+    print("  Created favicon.ico  (16/32/48/64)")
+
+
 def main() -> int:
     print("Generating Multiplication Quest icons...")
     make_icon(192)
     make_icon(512)
+    make_favicon_ico()
     print("Done!")
     return 0
 

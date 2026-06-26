@@ -5,6 +5,9 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>Multiplication Quest</title>
 <link rel="manifest" href="manifest.json" />
+<link rel="icon" href="favicon.ico" sizes="any" />
+<link rel="icon" type="image/png" sizes="16x16" href="favicon-16.png" />
+<link rel="icon" type="image/png" sizes="32x32" href="favicon-32.png" />
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
 <link rel="icon" type="image/png" sizes="512x512" href="icon-512.png" />
 <link rel="apple-touch-icon" href="icon-192.png" />
@@ -1373,6 +1376,17 @@ function checkAnswer() {
         return;
     }
     const inp       = document.getElementById('answer-input');
+
+    // Ignore Enter presses on an empty input — nudge the user to type
+    // something instead of marking it wrong.
+    if (inp.value.trim() === '') {
+        const feedback = document.getElementById('feedback');
+        feedback.textContent = 'Type an answer first!';
+        feedback.style.color = 'var(--pink)';
+        inp.focus();
+        return;
+    }
+
     const userVal   = parseAnswer(inp.value);
     const isCorrect = userVal === currentFact.answer;
     const elapsed   = nowMs() - questionShownAt;
