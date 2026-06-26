@@ -792,6 +792,17 @@ function emptyEntry() {
 // Daily round counter — resets at PST midnight so it behaves consistently
 // across devices and time zones.
 function todayKey() {
+    // Anchor the daily counter to the user's local timezone so "today" lines
+    // up with what they see on their device. (Previously hard-coded to PST,
+    // which silently dropped counts for users east of Pacific time.)
+    return new Intl.DateTimeFormat('en-CA', {
+        year: 'numeric', month: '2-digit', day: '2-digit'
+    }).format(new Date());
+}
+
+function pstTodayKey() {
+    // Kept for backward compatibility with daily entries written by older
+    // builds that anchored everything to America/Los_Angeles.
     return new Intl.DateTimeFormat('en-CA', {
         timeZone: 'America/Los_Angeles',
         year: 'numeric', month: '2-digit', day: '2-digit'
@@ -801,7 +812,14 @@ function todayKey() {
 function loadDaily() {
     const data = loadStats();
     const key  = todayKey();
-    return { date: key, count: (data.daily && data.daily[key]) || 0 };
+    let count = (data.daily && data.daily[key]) || 0;
+    // If the user has legacy counts saved under the PST key for the same
+    // local calendar day, surface them too so today's work is visible.
+    const pstKey = pstTodayKey();
+    if (pstKey !== key && data.daily && data.daily[pstKey]) {
+        count += data.daily[pstKey];
+    }
+    return { date: key, count };
 }
 
 function bumpDaily() {
